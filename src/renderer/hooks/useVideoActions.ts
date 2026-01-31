@@ -28,6 +28,8 @@ export function useVideoActions() {
     timelineMarkers,
     currentTimestamp,
     ffmpegStatus,
+    videosInDirectory,
+    currentVideoIndex,
   } = useStore();
 
   // Save current video state before switching
@@ -64,7 +66,8 @@ export function useVideoActions() {
         await loadVideo(result.filePath);
       }
     } catch (err) {
-      addToast({ type: 'error', message: `Failed to open video: ${err}`, duration: 5000 });
+      console.error('Failed to open video:', err);
+      addToast({ type: 'error', message: 'Failed to open video', duration: 5000 });
     }
   }, [ffmpegStatus.available]);
 
@@ -88,6 +91,9 @@ export function useVideoActions() {
       setLoadingMessage('Loading video...');
 
       try {
+        // Capture previous directory before updating current video
+        const previousDirectory = useStore.getState().currentVideo?.directory;
+
         // Get video info
         stepStart = performance.now();
         const videoInfo = await window.electronAPI.invoke('video:load', { filePath });
@@ -112,9 +118,11 @@ export function useVideoActions() {
           setCurrentTimestamp(savedState.lastPosition);
         }
 
-        // Clear directory video list - will be populated on-demand when user navigates
-        setVideosInDirectory([]);
-        setCurrentVideoIndex(-1);
+        // Clear directory list if we changed directories
+        if (previousDirectory !== videoInfo.directory) {
+          setVideosInDirectory([]);
+          setCurrentVideoIndex(-1);
+        }
 
         // Extract frames
         setLoadingMessage('Extracting frames...');
@@ -154,11 +162,11 @@ export function useVideoActions() {
 
         setIsLoading(false);
         setLoadingMessage('');
-        addToast({ type: 'success', message: `Loaded: ${videoInfo.fileName}`, duration: 2000 });
       } catch (err) {
         setIsLoading(false);
         setLoadingMessage('');
-        addToast({ type: 'error', message: `Failed to load video: ${err}`, duration: 5000 });
+        console.error('Failed to load video:', err);
+        addToast({ type: 'error', message: 'Failed to load video', duration: 5000 });
         throw err;
       }
     },
@@ -228,15 +236,90 @@ export function useVideoActions() {
 
         setIsLoading(false);
         setLoadingMessage('');
-        addToast({ type: 'success', message: `Extracted ${frames.length} frames`, duration: 2000 });
       } catch (err) {
         setIsLoading(false);
         setLoadingMessage('');
-        addToast({ type: 'error', message: `Failed to extract frames: ${err}`, duration: 5000 });
+        console.error('Failed to extract frames:', err);
+        addToast({ type: 'error', message: 'Failed to extract frames', duration: 5000 });
       }
     },
     [currentVideo, ffmpegStatus.available, settings]
   );
+
+  // Ensure directory list is populated, fetch if needed
+  const ensureDirectoryList = useCallback(async (): Promise<boolean> => {
+    if (!currentVideo) return false;
+
+    // Already have the list
+    if (videosInDirectory.length > 0) {
+      return true;
+    }
+
+    // Fetch the list
+    setIsLoading(true);
+    setLoadingMessage('Loading directory...');
+
+    try {
+      const videos = await window.electronAPI.invoke('fs:list-videos', {
+        directory: currentVideo.directory,
+      });
+      setVideosInDirectory(videos);
+
+      // Find current video's index
+      const idx = videos.findIndex((v: { filePath: string }) => v.filePath === currentVideo.filePath);
+      setCurrentVideoIndex(idx);
+
+      setIsLoading(false);
+      setLoadingMessage('');
+      return true;
+    } catch (err) {
+      setIsLoading(false);
+      setLoadingMessage('');
+      console.error('Failed to list videos:', err);
+      addToast({ type: 'error', message: 'Failed to list videos', duration: 5000 });
+      return false;
+    }
+  }, [currentVideo, videosInDirectory.length, setVideosInDirectory, setCurrentVideoIndex, setIsLoading, setLoadingMessage, addToast]);
+
+  // Navigate to next video in directory
+  const navigateToNextVideo = useCallback(async () => {
+    if (!currentVideo) return;
+
+    const hasVideos = await ensureDirectoryList();
+    if (!hasVideos) return;
+
+    // Re-read from store after async operation
+    const { videosInDirectory: videos, currentVideoIndex: idx } = useStore.getState();
+    if (videos.length === 0) return;
+
+    const nextIndex = (idx + 1) % videos.length;
+    const nextVideo = videos[nextIndex];
+    if (nextVideo) {
+      await loadVideo(nextVideo.filePath);
+      // Update index after loading
+      setCurrentVideoIndex(nextIndex);
+    }
+  }, [currentVideo, ensureDirectoryList, loadVideo, setCurrentVideoIndex]);
+
+  // Navigate to previous video in directory
+  const navigateToPreviousVideo = useCallback(async () => {
+    if (!currentVideo) return;
+
+    const hasVideos = await ensureDirectoryList();
+    if (!hasVideos) return;
+
+    // Re-read from store after async operation
+    const { videosInDirectory: videos, currentVideoIndex: idx } = useStore.getState();
+    if (videos.length === 0) return;
+
+    const prevIndex = idx <= 0 ? videos.length - 1 : idx - 1;
+    const prevVideo = videos[prevIndex];
+    if (prevVideo) {
+      await loadVideo(prevVideo.filePath);
+      // Update index after loading
+      setCurrentVideoIndex(prevIndex);
+    }
+  }, [currentVideo, ensureDirectoryList, loadVideo, setCurrentVideoIndex]);
 
   return {
     openVideo,
@@ -244,5 +327,7 @@ export function useVideoActions() {
     loadVideoFromQueue,
     saveCurrentVideoState,
     reExtractFrames,
+    navigateToNextVideo,
+    navigateToPreviousVideo,
   };
 }

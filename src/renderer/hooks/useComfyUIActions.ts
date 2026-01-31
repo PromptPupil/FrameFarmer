@@ -34,7 +34,8 @@ export function useComfyUIActions() {
       return result.connected;
     } catch (err) {
       setComfyuiConnected(false);
-      addToast({ type: 'error', message: `Connection error: ${err}`, duration: 3000 });
+      console.error('ComfyUI connection error:', err);
+      addToast({ type: 'error', message: 'ComfyUI connection error', duration: 3000 });
       return false;
     }
   }, [settings.comfyuiBaseUrl]);
@@ -107,7 +108,8 @@ export function useComfyUIActions() {
         });
       }
     } catch (err) {
-      addToast({ type: 'error', message: `Failed to send to ComfyUI: ${err}`, duration: 5000 });
+      console.error('Failed to send to ComfyUI:', err);
+      addToast({ type: 'error', message: 'Failed to send to ComfyUI', duration: 5000 });
     }
   }, [selectedWorkflow, selectedFrames, comfyuiInputSlots, frames, settings.comfyuiBaseUrl]);
 

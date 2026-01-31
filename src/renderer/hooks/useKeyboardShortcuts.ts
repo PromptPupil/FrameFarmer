@@ -9,8 +9,6 @@ export function useKeyboardShortcuts() {
     togglePlayPause,
     setCurrentTimestamp,
     currentTimestamp,
-    goToNextVideo,
-    goToPreviousVideo,
     selectAll,
     selectNone,
     invertSelection,
@@ -25,9 +23,10 @@ export function useKeyboardShortcuts() {
     setShowBlurryFrames,
     showDuplicateFrames,
     setShowDuplicateFrames,
+    isLoading,
   } = useStore();
 
-  const { openVideo } = useVideoActions();
+  const { openVideo, navigateToNextVideo, navigateToPreviousVideo } = useVideoActions();
   const { saveSelectedFrames, grabFrameAtPlayhead } = useFrameActions();
 
   const handleKeyDown = useCallback(
@@ -85,11 +84,11 @@ export function useKeyboardShortcuts() {
           break;
         case 'ArrowUp':
           e.preventDefault();
-          goToPreviousVideo();
+          if (!isLoading) navigateToPreviousVideo();
           break;
         case 'ArrowDown':
           e.preventDefault();
-          goToNextVideo();
+          if (!isLoading) navigateToNextVideo();
           break;
         case ' ':
           e.preventDefault();
@@ -192,6 +191,7 @@ export function useKeyboardShortcuts() {
       thumbnailSize,
       showBlurryFrames,
       showDuplicateFrames,
+      isLoading,
       openVideo,
       saveSelectedFrames,
       grabFrameAtPlayhead,

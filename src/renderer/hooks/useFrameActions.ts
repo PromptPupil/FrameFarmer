@@ -60,7 +60,8 @@ export function useFrameActions() {
       await window.electronAPI.invoke('fs:open-folder', { folderPath: outputDir });
     } catch (err) {
       setExtractionProgress(null);
-      addToast({ type: 'error', message: `Failed to save frames: ${err}`, duration: 5000 });
+      console.error('Failed to save frames:', err);
+      addToast({ type: 'error', message: 'Failed to save frames', duration: 5000 });
     }
   }, [currentVideo, selectedFrames, frames, settings, ffmpegStatus.available]);
 
@@ -89,19 +90,14 @@ export function useFrameActions() {
       if (existingFrame) {
         // Just select it
         selectFrame(frame.frameNumber);
-        addToast({ type: 'info', message: `Frame ${frame.frameNumber} selected`, duration: 1500 });
       } else {
         // Add new frame and select it
         addFrame(frame);
         selectFrame(frame.frameNumber);
-        addToast({
-          type: 'success',
-          message: `Grabbed frame ${frame.frameNumber}`,
-          duration: 1500,
-        });
       }
     } catch (err) {
-      addToast({ type: 'error', message: `Failed to grab frame: ${err}`, duration: 3000 });
+      console.error('Failed to grab frame:', err);
+      addToast({ type: 'error', message: 'Failed to grab frame', duration: 3000 });
     }
   }, [currentVideo, currentTimestamp, frames, ffmpegStatus.available]);
 
@@ -148,7 +144,8 @@ export function useFrameActions() {
         // Open containing folder
         await window.electronAPI.invoke('fs:open-folder', { folderPath: baseDir });
       } catch (err) {
-        addToast({ type: 'error', message: `Failed to export: ${err}`, duration: 5000 });
+        console.error('Failed to export:', err);
+        addToast({ type: 'error', message: 'Failed to export', duration: 5000 });
         throw err;
       }
     },
