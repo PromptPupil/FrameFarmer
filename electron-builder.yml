@@ -1,0 +1,32 @@
+appId: com.framefarmer.app
+productName: FrameFarmer
+copyright: Copyright 2025
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - dist/**/*
+  - resources/**/*
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.ico
+  artifactName: ${productName}-${version}-Setup.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+
+extraResources:
+  - from: resources/sounds
+    to: sounds
+
+asar: true
+asarUnpack:
+  - "**/*.node"

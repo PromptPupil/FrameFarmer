@@ -1,0 +1,212 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #505050;
+}
+
+/* Prevent text selection on UI elements */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Video element styling */
+video {
+  background-color: #000;
+}
+
+/* Frame thumbnail hover effect */
+.frame-thumbnail {
+  @apply transition-all duration-150 ease-in-out;
+}
+
+.frame-thumbnail:hover {
+  @apply ring-2 ring-frame-hover;
+}
+
+.frame-thumbnail.selected {
+  @apply ring-2 ring-frame-selected;
+}
+
+/* Panel styling */
+.panel {
+  @apply bg-bg-secondary rounded-lg border border-border;
+}
+
+/* Button base styles */
+.btn {
+  @apply px-3 py-1.5 rounded font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg-primary;
+}
+
+.btn-primary {
+  @apply bg-accent text-white hover:bg-accent-hover;
+}
+
+.btn-secondary {
+  @apply bg-bg-tertiary text-text-primary hover:bg-border;
+}
+
+.btn-ghost {
+  @apply bg-transparent text-text-primary hover:bg-bg-tertiary;
+}
+
+.btn-danger {
+  @apply bg-error text-white hover:bg-red-600;
+}
+
+/* Input styles */
+.input {
+  @apply bg-bg-tertiary border border-border rounded px-3 py-1.5 text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent;
+}
+
+/* Dropdown/select styles */
+.select {
+  @apply bg-bg-tertiary border border-border rounded px-3 py-1.5 text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent cursor-pointer;
+}
+
+/* Slider/range styles */
+input[type='range'] {
+  @apply w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  @apply appearance-none w-4 h-4 bg-accent rounded-full cursor-pointer;
+}
+
+/* Toggle/checkbox styles */
+.toggle {
+  @apply relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out cursor-pointer;
+}
+
+.toggle.on {
+  @apply bg-accent;
+}
+
+.toggle.off {
+  @apply bg-bg-tertiary;
+}
+
+.toggle-thumb {
+  @apply inline-block h-4 w-4 transform rounded-full bg-white transition duration-200 ease-in-out;
+}
+
+/* Toast animation */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.toast-enter {
+  animation: slideIn 0.3s ease-out;
+}
+
+.toast-exit {
+  animation: slideOut 0.3s ease-in;
+}
+
+/* Scrubber timeline */
+.scrubber-track {
+  @apply relative h-2 bg-bg-tertiary rounded-full cursor-pointer;
+}
+
+.scrubber-progress {
+  @apply absolute left-0 top-0 h-full bg-accent rounded-full pointer-events-none;
+}
+
+.scrubber-thumb {
+  @apply absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg cursor-grab;
+}
+
+.scrubber-thumb:active {
+  @apply cursor-grabbing;
+}
+
+/* Timeline marker */
+.timeline-marker {
+  @apply absolute top-0 w-0.5 h-full bg-warning cursor-pointer;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  @apply w-6 h-6 border-2 border-text-secondary border-t-accent rounded-full;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Dialog overlay */
+.dialog-overlay {
+  @apply fixed inset-0 bg-black/50 flex items-center justify-center z-50;
+}
+
+.dialog-content {
+  @apply bg-bg-secondary rounded-lg shadow-xl border border-border max-w-lg w-full mx-4 max-h-[90vh] overflow-auto;
+}
+
+/* Analysis badges */
+.badge {
+  @apply inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-medium rounded;
+}
+
+.badge-blur {
+  @apply bg-frame-blurry/20 text-frame-blurry;
+}
+
+.badge-duplicate {
+  @apply bg-frame-duplicate/20 text-frame-duplicate;
+}
+
+/* Grid layout for frames */
+.frame-grid {
+  @apply grid gap-2 p-2;
+}
+
+.frame-grid.size-small {
+  @apply grid-cols-[repeat(auto-fill,minmax(100px,1fr))];
+}
+
+.frame-grid.size-medium {
+  @apply grid-cols-[repeat(auto-fill,minmax(180px,1fr))];
+}
+
+.frame-grid.size-large {
+  @apply grid-cols-[repeat(auto-fill,minmax(280px,1fr))];
+}
