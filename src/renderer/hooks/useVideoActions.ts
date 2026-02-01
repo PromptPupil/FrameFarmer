@@ -12,7 +12,6 @@ export function useVideoActions() {
     setCurrentTimestamp,
     setVideosInDirectory,
     setCurrentVideoIndex,
-    setSelectedFrames,
     setIsLoading,
     setLoadingMessage,
     setExtractionProgress,
@@ -87,6 +86,38 @@ export function useVideoActions() {
       await saveCurrentVideoState();
       timing['saveCurrentVideoState'] = performance.now() - stepStart;
 
+      // Auto-save selected frames before switching videos
+      const currentState = useStore.getState();
+      if (currentState.currentVideo && currentState.selectedFrames.size > 0) {
+        try {
+          const baseDir = settings.outputFolderBase ?? currentState.currentVideo.directory;
+          const videoName = currentState.currentVideo.fileName.replace(/\.[^.]+$/, '');
+          const dateStr = new Date().toISOString().split('T')[0];
+          const outputDir = `${baseDir}/${videoName}_${dateStr}`;
+
+          const selectedFrameData = currentState.frames
+            .filter((f) => currentState.selectedFrames.has(f.frameNumber))
+            .map((f) => ({ frameNumber: f.frameNumber, timestamp: f.timestamp }));
+
+          await window.electronAPI.invoke('frame:save', {
+            videoPath: currentState.currentVideo.filePath,
+            frames: selectedFrameData,
+            outputDir,
+            filenamePattern: settings.filenamePattern,
+            format: settings.outputFormat,
+            jpgQuality: settings.jpgQuality,
+          });
+
+          addToast({
+            type: 'success',
+            message: `Auto-saved ${selectedFrameData.length} frames`,
+            duration: 2000,
+          });
+        } catch (err) {
+          console.error('Failed to auto-save frames:', err);
+        }
+      }
+
       setIsLoading(true);
       setLoadingMessage('Loading video...');
 
@@ -108,12 +139,11 @@ export function useVideoActions() {
         setCurrentTimestamp(0);
         setExtractionProgress(null);
 
-        // Load saved state for this video
+        // Load saved state for this video (but not frame selections - those always start fresh)
         stepStart = performance.now();
         const savedState = await window.electronAPI.invoke('db:get-video-state', { filePath });
         timing['db:get-video-state'] = performance.now() - stepStart;
         if (savedState) {
-          setSelectedFrames(savedState.selectedFrames);
           setTimelineMarkers(savedState.timelineMarkers);
           setCurrentTimestamp(savedState.lastPosition);
         }
@@ -322,14 +352,20 @@ export function useVideoActions() {
       }
     }
 
-    const nextIndex = (idx + 1) % videos.length;
+    // Check if still at boundary after refresh
+    if (idx >= videos.length - 1) {
+      addToast({ type: 'info', message: 'This is the oldest video in the folder', duration: 2000 });
+      return;
+    }
+
+    const nextIndex = idx + 1;
     const nextVideo = videos[nextIndex];
     if (nextVideo) {
       await loadVideo(nextVideo.filePath);
       // Update index after loading
       setCurrentVideoIndex(nextIndex);
     }
-  }, [currentVideo, ensureDirectoryList, loadVideo, setCurrentVideoIndex, setVideosInDirectory]);
+  }, [currentVideo, ensureDirectoryList, loadVideo, setCurrentVideoIndex, setVideosInDirectory, addToast]);
 
   // Navigate to previous video in directory
   const navigateToPreviousVideo = useCallback(async () => {
@@ -363,14 +399,20 @@ export function useVideoActions() {
       }
     }
 
-    const prevIndex = idx <= 0 ? videos.length - 1 : idx - 1;
+    // Check if still at boundary after refresh
+    if (idx <= 0) {
+      addToast({ type: 'info', message: 'This is the newest video in the folder', duration: 2000 });
+      return;
+    }
+
+    const prevIndex = idx - 1;
     const prevVideo = videos[prevIndex];
     if (prevVideo) {
       await loadVideo(prevVideo.filePath);
       // Update index after loading
       setCurrentVideoIndex(prevIndex);
     }
-  }, [currentVideo, ensureDirectoryList, loadVideo, setCurrentVideoIndex, setVideosInDirectory]);
+  }, [currentVideo, ensureDirectoryList, loadVideo, setCurrentVideoIndex, setVideosInDirectory, addToast]);
 
   return {
     openVideo,

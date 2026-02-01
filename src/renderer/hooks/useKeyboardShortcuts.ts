@@ -24,6 +24,7 @@ export function useKeyboardShortcuts() {
     showDuplicateFrames,
     setShowDuplicateFrames,
     isLoading,
+    addToast,
   } = useStore();
 
   const { openVideo, navigateToNextVideo, navigateToPreviousVideo } = useVideoActions();
@@ -77,9 +78,14 @@ export function useKeyboardShortcuts() {
           e.preventDefault();
           if (currentVideo) {
             const frameDuration = 1 / currentVideo.frameRate;
-            seekTo(
-              Math.min(currentVideo.duration, currentTimestamp + frameDuration)
-            );
+            // Check if already at or near the last frame
+            const maxSeekableTime = currentVideo.duration - frameDuration / 2;
+            if (currentTimestamp >= maxSeekableTime) {
+              addToast({ type: 'info', message: 'End of video', duration: 1500 });
+            } else {
+              const newTime = currentTimestamp + frameDuration;
+              seekTo(Math.min(newTime, maxSeekableTime));
+            }
           }
           break;
         case 'ArrowUp':
@@ -142,6 +148,7 @@ export function useKeyboardShortcuts() {
         // Grab frame
         case 'g':
         case 'G':
+        case 'Enter':
           e.preventDefault();
           grabFrameAtPlayhead();
           break;
@@ -195,6 +202,7 @@ export function useKeyboardShortcuts() {
       openVideo,
       saveSelectedFrames,
       grabFrameAtPlayhead,
+      addToast,
     ]
   );
 
