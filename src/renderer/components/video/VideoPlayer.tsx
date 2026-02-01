@@ -1,8 +1,19 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useStore } from '../../store';
 import { VideoControls } from './VideoControls';
 import { Scrubber } from './Scrubber';
 import { TimeDisplay } from './TimeDisplay';
+
+const debugLog: string[] = [];
+function logDebug(msg: string) {
+  const entry = `${new Date().toISOString().slice(11, 23)} ${msg}`;
+  debugLog.push(entry);
+  if (debugLog.length > 50) debugLog.shift();
+  window.electronAPI?.invoke('debug:write-timing', {
+    timing: { _log: 1 },
+    filePath: debugLog.join('\n')
+  }).catch(() => {});
+}
 
 export function VideoPlayer() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -11,6 +22,7 @@ export function VideoPlayer() {
     currentVideo,
     currentTimestamp,
     setCurrentTimestamp,
+    setIsSeeking,
     isPlaying,
     setIsPlaying,
     playbackSpeed,
@@ -50,22 +62,36 @@ export function VideoPlayer() {
   }, [volume, isMuted]);
 
   // Sync store timestamp to video element (for external changes like keyboard shortcuts)
-  useEffect(() => {
+  useLayoutEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video) {
+      logDebug(`EFFECT: no video ref`);
+      return;
+    }
+
+    const seekable = video.seekable;
+    const seekableRanges = [];
+    for (let i = 0; i < seekable.length; i++) {
+      seekableRanges.push(`${seekable.start(i).toFixed(2)}-${seekable.end(i).toFixed(2)}`);
+    }
+
+    const diff = Math.abs(video.currentTime - currentTimestamp);
+    logDebug(`EFFECT: readyState=${video.readyState} seekable=[${seekableRanges.join(',')}] video.currentTime=${video.currentTime.toFixed(3)} store=${currentTimestamp.toFixed(3)}`);
 
     // Only sync if there's a meaningful difference
-    if (Math.abs(video.currentTime - currentTimestamp) > 0.01) {
+    if (diff > 0.01) {
       isSeeking.current = true;
       video.currentTime = currentTimestamp;
+      logDebug(`EFFECT: SET video.currentTime=${currentTimestamp.toFixed(3)}`);
     }
   }, [currentTimestamp]);
 
   // Handle time updates from video element
   const handleTimeUpdate = useCallback(() => {
     const video = videoRef.current;
-    // Don't update store while seeking - wait for seeked event
+    // Don't update store while seeking
     if (video && !isSeeking.current && !video.seeking) {
+      logDebug(`TIMEUPDATE: setting store to ${video.currentTime.toFixed(3)}`);
       setCurrentTimestamp(video.currentTime);
     }
   }, [setCurrentTimestamp]);
@@ -73,19 +99,20 @@ export function VideoPlayer() {
   // Handle seek completion
   const handleSeeked = useCallback(() => {
     const video = videoRef.current;
+    logDebug(`SEEKED: video.currentTime=${video?.currentTime.toFixed(3)} isSeeking was ${isSeeking.current}`);
     isSeeking.current = false;
-    if (video) {
-      setCurrentTimestamp(video.currentTime);
-    }
-  }, [setCurrentTimestamp]);
+    setIsSeeking(false);
+  }, [setIsSeeking]);
 
   // Seek to specific time
   const seekTo = useCallback((time: number) => {
     const video = videoRef.current;
+    logDebug(`SEEKTO: called with ${time.toFixed(3)}, video=${!!video}, currentVideo=${!!currentVideo}`);
     if (video && currentVideo) {
       isSeeking.current = true;
       const clampedTime = Math.max(0, Math.min(time, currentVideo.duration));
       video.currentTime = clampedTime;
+      logDebug(`SEEKTO: set video.currentTime=${clampedTime.toFixed(3)}`);
       setCurrentTimestamp(clampedTime);
     }
   }, [currentVideo, setCurrentTimestamp]);
@@ -172,6 +199,7 @@ export function VideoPlayer() {
           currentTime={currentTimestamp}
           duration={currentVideo.duration}
           frameRate={currentVideo.frameRate}
+          totalFrames={currentVideo.totalFrames}
         />
       </div>
     </div>

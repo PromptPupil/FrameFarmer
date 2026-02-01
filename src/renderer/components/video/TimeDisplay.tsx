@@ -4,11 +4,11 @@ interface TimeDisplayProps {
   currentTime: number;
   duration: number;
   frameRate: number;
+  totalFrames: number;
 }
 
-export function TimeDisplay({ currentTime, duration, frameRate }: TimeDisplayProps) {
-  const currentFrame = Math.round(currentTime * frameRate);
-  const totalFrames = Math.round(duration * frameRate);
+export function TimeDisplay({ currentTime, duration, frameRate, totalFrames }: TimeDisplayProps) {
+  const currentFrame = Math.min(Math.floor(currentTime * frameRate), totalFrames - 1);
 
   return (
     <div className="flex items-center justify-between text-sm">

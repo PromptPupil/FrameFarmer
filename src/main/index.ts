@@ -109,7 +109,7 @@ app.whenReady().then(() => {
   log.info('FrameFarmer starting...');
   log.info(`FFmpeg status: ${JSON.stringify(ffmpegService.getStatus())}`);
 
-  // Register custom protocol to serve local files
+  // Register custom protocol to serve local files with range request support
   protocol.handle('local-file', async (request) => {
     // Parse the URL - the drive letter becomes the hostname
     // URL: local-file:///C:/path -> hostname='c', pathname='/path'
@@ -121,23 +121,59 @@ app.whenReady().then(() => {
 
     log.debug(`Protocol handler: ${request.url} -> ${filePath}`);
 
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.mp4': 'video/mp4',
+      '.webm': 'video/webm',
+      '.avi': 'video/x-msvideo',
+      '.mov': 'video/quicktime',
+      '.mkv': 'video/x-matroska',
+      '.wmv': 'video/x-ms-wmv',
+    };
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+
     try {
+      const stat = await fs.promises.stat(filePath);
+      const fileSize = stat.size;
+      const rangeHeader = request.headers.get('Range');
+
+      if (rangeHeader) {
+        // Parse range header: "bytes=start-end"
+        const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
+        if (match) {
+          const start = match[1] ? parseInt(match[1], 10) : 0;
+          const end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
+          const chunkSize = end - start + 1;
+
+          const fileHandle = await fs.promises.open(filePath, 'r');
+          const buffer = Buffer.alloc(chunkSize);
+          await fileHandle.read(buffer, 0, chunkSize, start);
+          await fileHandle.close();
+
+          return new Response(buffer, {
+            status: 206,
+            headers: {
+              'Content-Type': contentType,
+              'Content-Length': String(chunkSize),
+              'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+              'Accept-Ranges': 'bytes',
+            },
+          });
+        }
+      }
+
+      // No range request - return full file
       const data = await fs.promises.readFile(filePath);
-      const ext = path.extname(filePath).toLowerCase();
-      const mimeTypes: Record<string, string> = {
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.png': 'image/png',
-        '.gif': 'image/gif',
-        '.mp4': 'video/mp4',
-        '.webm': 'video/webm',
-        '.avi': 'video/x-msvideo',
-        '.mov': 'video/quicktime',
-        '.mkv': 'video/x-matroska',
-        '.wmv': 'video/x-ms-wmv',
-      };
       return new Response(data, {
-        headers: { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' },
+        headers: {
+          'Content-Type': contentType,
+          'Content-Length': String(fileSize),
+          'Accept-Ranges': 'bytes',
+        },
       });
     } catch (err) {
       log.error(`Failed to load file: ${filePath}`, err);

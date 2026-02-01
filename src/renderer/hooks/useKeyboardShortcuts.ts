@@ -7,7 +7,7 @@ export function useKeyboardShortcuts() {
   const {
     currentVideo,
     togglePlayPause,
-    setCurrentTimestamp,
+    seekTo,
     currentTimestamp,
     selectAll,
     selectNone,
@@ -70,14 +70,14 @@ export function useKeyboardShortcuts() {
           e.preventDefault();
           if (currentVideo) {
             const frameDuration = 1 / currentVideo.frameRate;
-            setCurrentTimestamp(Math.max(0, currentTimestamp - frameDuration));
+            seekTo(Math.max(0, currentTimestamp - frameDuration));
           }
           break;
         case 'ArrowRight':
           e.preventDefault();
           if (currentVideo) {
             const frameDuration = 1 / currentVideo.frameRate;
-            setCurrentTimestamp(
+            seekTo(
               Math.min(currentVideo.duration, currentTimestamp + frameDuration)
             );
           }
@@ -96,12 +96,12 @@ export function useKeyboardShortcuts() {
           break;
         case 'Home':
           e.preventDefault();
-          setCurrentTimestamp(0);
+          seekTo(0);
           break;
         case 'End':
           e.preventDefault();
           if (currentVideo) {
-            setCurrentTimestamp(currentVideo.duration);
+            seekTo(currentVideo.duration);
           }
           break;
 

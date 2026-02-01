@@ -318,15 +318,22 @@ class FFmpegService {
 
     const effectiveDuration = duration - startOffset - endOffset;
 
+    // Cap at 1.5 frames before duration to ensure valid content
+    const maxTimestamp = duration - (1.5 / frameRate);
+
     if (frameCount === 1) {
       timestamps.push(duration / 2);
     } else {
       const step = effectiveDuration / (frameCount - 1);
       for (let i = 0; i < frameCount; i++) {
         const time = startOffset + i * step;
-        // Snap to nearest frame boundary
         const frameNum = Math.round(time * frameRate);
-        timestamps.push(frameNum / frameRate);
+        let timestamp = frameNum / frameRate;
+        // Cap to ensure we stay within valid content
+        if (timestamp > maxTimestamp) {
+          timestamp = maxTimestamp;
+        }
+        timestamps.push(timestamp);
       }
     }
 

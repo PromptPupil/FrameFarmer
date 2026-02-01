@@ -29,6 +29,9 @@ interface VideoSlice {
 interface PlaybackSlice {
   currentTimestamp: number;
   setCurrentTimestamp: (ts: number) => void;
+  isSeeking: boolean;
+  setIsSeeking: (seeking: boolean) => void;
+  seekTo: (ts: number) => void;
   isPlaying: boolean;
   setIsPlaying: (playing: boolean) => void;
   togglePlayPause: () => void;
@@ -187,6 +190,9 @@ export const useStore = create<FrameFarmerStore>()((set, get) => ({
     // ============ Playback Slice ============
     currentTimestamp: 0,
     setCurrentTimestamp: (ts) => set({ currentTimestamp: ts }),
+    isSeeking: false,
+    setIsSeeking: (seeking) => set({ isSeeking: seeking }),
+    seekTo: (ts) => set({ isSeeking: true, currentTimestamp: ts }),
     isPlaying: false,
     setIsPlaying: (playing) => set({ isPlaying: playing }),
     togglePlayPause: () => set((state) => ({ isPlaying: !state.isPlaying })),
