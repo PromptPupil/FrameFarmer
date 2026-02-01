@@ -122,6 +122,15 @@ export function useVideoActions() {
         if (previousDirectory !== videoInfo.directory) {
           setVideosInDirectory([]);
           setCurrentVideoIndex(-1);
+        } else {
+          // Same directory - update index to match newly loaded video
+          const currentVideos = useStore.getState().videosInDirectory;
+          if (currentVideos.length > 0) {
+            const newIdx = currentVideos.findIndex((v: { filePath: string }) => v.filePath === filePath);
+            if (newIdx !== -1) {
+              setCurrentVideoIndex(newIdx);
+            }
+          }
         }
 
         // Extract frames
@@ -289,8 +298,29 @@ export function useVideoActions() {
     if (!hasVideos) return;
 
     // Re-read from store after async operation
-    const { videosInDirectory: videos, currentVideoIndex: idx } = useStore.getState();
+    let { videosInDirectory: videos, currentVideoIndex: idx } = useStore.getState();
     if (videos.length === 0) return;
+
+    // At boundary - refresh list to check for new videos
+    if (idx >= videos.length - 1) {
+      try {
+        const freshVideos = await window.electronAPI.invoke('fs:list-videos', {
+          directory: currentVideo.directory,
+        });
+        setVideosInDirectory(freshVideos);
+
+        // Find current video's position in refreshed list
+        const newIdx = freshVideos.findIndex((v: { filePath: string }) => v.filePath === currentVideo.filePath);
+        if (newIdx !== -1) {
+          setCurrentVideoIndex(newIdx);
+          idx = newIdx;
+        }
+        videos = freshVideos;
+      } catch (err) {
+        console.error('Failed to refresh video list:', err);
+        // Fall through with existing list
+      }
+    }
 
     const nextIndex = (idx + 1) % videos.length;
     const nextVideo = videos[nextIndex];
@@ -299,7 +329,7 @@ export function useVideoActions() {
       // Update index after loading
       setCurrentVideoIndex(nextIndex);
     }
-  }, [currentVideo, ensureDirectoryList, loadVideo, setCurrentVideoIndex]);
+  }, [currentVideo, ensureDirectoryList, loadVideo, setCurrentVideoIndex, setVideosInDirectory]);
 
   // Navigate to previous video in directory
   const navigateToPreviousVideo = useCallback(async () => {
@@ -309,8 +339,29 @@ export function useVideoActions() {
     if (!hasVideos) return;
 
     // Re-read from store after async operation
-    const { videosInDirectory: videos, currentVideoIndex: idx } = useStore.getState();
+    let { videosInDirectory: videos, currentVideoIndex: idx } = useStore.getState();
     if (videos.length === 0) return;
+
+    // At boundary - refresh list to check for new videos
+    if (idx <= 0) {
+      try {
+        const freshVideos = await window.electronAPI.invoke('fs:list-videos', {
+          directory: currentVideo.directory,
+        });
+        setVideosInDirectory(freshVideos);
+
+        // Find current video's position in refreshed list
+        const newIdx = freshVideos.findIndex((v: { filePath: string }) => v.filePath === currentVideo.filePath);
+        if (newIdx !== -1) {
+          setCurrentVideoIndex(newIdx);
+          idx = newIdx;
+        }
+        videos = freshVideos;
+      } catch (err) {
+        console.error('Failed to refresh video list:', err);
+        // Fall through with existing list
+      }
+    }
 
     const prevIndex = idx <= 0 ? videos.length - 1 : idx - 1;
     const prevVideo = videos[prevIndex];
@@ -319,7 +370,7 @@ export function useVideoActions() {
       // Update index after loading
       setCurrentVideoIndex(prevIndex);
     }
-  }, [currentVideo, ensureDirectoryList, loadVideo, setCurrentVideoIndex]);
+  }, [currentVideo, ensureDirectoryList, loadVideo, setCurrentVideoIndex, setVideosInDirectory]);
 
   return {
     openVideo,
