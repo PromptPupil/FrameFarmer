@@ -209,7 +209,7 @@ export interface IpcChannels {
   };
   'app:play-notification-sound': {
     request: Record<string, never>;
-    response: { success: boolean };
+    response: { success: boolean; soundPath?: string };
   };
 }
 

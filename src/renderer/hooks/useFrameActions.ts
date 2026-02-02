@@ -51,12 +51,6 @@ export function useFrameActions() {
 
       setExtractionProgress(null);
 
-      addToast({
-        type: 'success',
-        message: `Saved ${result.savedPaths.length} frames`,
-        duration: 3000,
-      });
-
       setFramesSavedForCurrentVideo(true);
 
       // Offer to open folder

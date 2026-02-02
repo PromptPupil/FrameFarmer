@@ -53,7 +53,8 @@ export function getResourcesPath(): string {
   if (app.isPackaged) {
     return process.resourcesPath;
   }
-  return path.join(__dirname, '../../resources');
+  // In development, app.getAppPath() returns the project root
+  return path.join(app.getAppPath(), 'resources');
 }
 
 /**
@@ -63,7 +64,8 @@ export function getSoundsPath(): string {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'sounds');
   }
-  return path.join(__dirname, '../../resources/sounds');
+  // In development, app.getAppPath() returns the project root
+  return path.join(app.getAppPath(), 'resources/sounds');
 }
 
 /**

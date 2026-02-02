@@ -25,9 +25,10 @@ export function useKeyboardShortcuts() {
     setShowDuplicateFrames,
     isLoading,
     addToast,
+    videoQueue,
   } = useStore();
 
-  const { openVideo, navigateToNextVideo, navigateToPreviousVideo } = useVideoActions();
+  const { openVideo, navigateToNextVideo, navigateToPreviousVideo, loadVideoFromQueue } = useVideoActions();
   const { saveSelectedFrames, grabFrameAtPlayhead } = useFrameActions();
 
   const handleKeyDown = useCallback(
@@ -189,6 +190,15 @@ export function useKeyboardShortcuts() {
           e.preventDefault();
           setShowDuplicateFrames(!showDuplicateFrames);
           break;
+
+        // Load first queue item
+        case 'q':
+        case 'Q':
+          e.preventDefault();
+          if (videoQueue.length > 0) {
+            loadVideoFromQueue(videoQueue[0].id);
+          }
+          break;
       }
     },
     [
@@ -203,6 +213,8 @@ export function useKeyboardShortcuts() {
       saveSelectedFrames,
       grabFrameAtPlayhead,
       addToast,
+      videoQueue,
+      loadVideoFromQueue,
     ]
   );
 

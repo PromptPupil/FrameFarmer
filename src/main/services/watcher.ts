@@ -25,6 +25,8 @@ class WatcherService {
         ignored: /(^|[\/\\])\../, // Ignore hidden files
         persistent: true,
         ignoreInitial: true, // Don't fire for existing files
+        usePolling: true, // Required for network/mapped drives
+        interval: 1000, // Poll every 1 second
         awaitWriteFinish: {
           stabilityThreshold: 2000, // Wait 2 seconds after file stops changing
           pollInterval: 100,

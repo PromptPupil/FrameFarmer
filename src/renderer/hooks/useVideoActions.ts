@@ -19,9 +19,11 @@ export function useVideoActions() {
     setAnalysisProgress,
     setAllAnalysisResults,
     addToast,
+    removeToast,
+    toasts,
     settings,
     videoQueue,
-    updateQueueItem,
+    removeFromQueue,
     currentVideo,
     selectedFrames,
     timelineMarkers,
@@ -218,16 +220,20 @@ export function useVideoActions() {
       const queueItem = videoQueue.find((v) => v.id === queueId);
       if (!queueItem) return;
 
-      updateQueueItem(queueId, { status: 'processing' });
+      // Remove any toast notification for this file
+      const relatedToast = toasts.find((t) => t.message.includes(queueItem.fileName));
+      if (relatedToast) {
+        removeToast(relatedToast.id);
+      }
 
       try {
         await loadVideo(queueItem.filePath);
-        updateQueueItem(queueId, { status: 'completed', processedAt: new Date() });
+        removeFromQueue(queueId);
       } catch {
-        updateQueueItem(queueId, { status: 'pending' });
+        // Keep in queue on failure
       }
     },
-    [videoQueue, loadVideo, updateQueueItem]
+    [videoQueue, toasts, loadVideo, removeFromQueue, removeToast]
   );
 
   // Re-extract frames with new frame count (for current video)

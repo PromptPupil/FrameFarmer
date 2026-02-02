@@ -22,10 +22,14 @@ export function QueueItem({ item, onClick }: QueueItemProps) {
   // Extract just the filename
   const fileName = item.fileName || item.filePath.split(/[/\\]/).pop() || 'Unknown';
 
+  const buttonClass = item.status === 'pending'
+    ? 'flex items-center gap-2 px-3 py-1.5 bg-bg-tertiary rounded hover:bg-border transition-colors queue-item-pending'
+    : 'flex items-center gap-2 px-3 py-1.5 bg-bg-tertiary rounded hover:bg-border transition-colors';
+
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 px-3 py-1.5 bg-bg-tertiary rounded hover:bg-border transition-colors"
+      className={buttonClass}
       title={item.filePath}
     >
       <span className={statusClass}>{statusIcon}</span>

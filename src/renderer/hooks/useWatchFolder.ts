@@ -49,14 +49,17 @@ export function useWatchFolder() {
   }, [settings.watchFolderEnabled, settings.watchFolderPath]);
 }
 
-function playNotificationSound() {
+async function playNotificationSound() {
   try {
-    // Create an audio element and play the notification sound
-    const audio = new Audio('file:///notification.wav');
-    audio.volume = 0.5;
-    audio.play().catch(() => {
-      // Ignore errors if sound can't be played
-    });
+    const result = await window.electronAPI.invoke('app:play-notification-sound', {});
+    if (result.success && result.soundPath) {
+      const soundUrl = `local-file:///${result.soundPath.replace(/\\/g, '/')}`;
+      const audio = new Audio(soundUrl);
+      audio.volume = 0.1;
+      audio.play().catch(() => {
+        // Ignore errors if sound can't be played
+      });
+    }
   } catch {
     // Ignore errors
   }

@@ -3,10 +3,11 @@ import log from 'electron-log';
 import type { FrameAnalysis } from '../../shared/types';
 
 /**
- * Calculate blur score using Laplacian variance method.
- * Higher score = more blurry (0-100 scale)
+ * Calculate raw Laplacian variance for an image.
+ * Higher variance = sharper image.
+ * Returns raw variance value (not normalized).
  */
-export async function calculateBlurScore(imagePath: string): Promise<number> {
+export async function calculateLaplacianVariance(imagePath: string): Promise<number> {
   try {
     // Load image and convert to grayscale
     const { data, info } = await sharp(imagePath)
@@ -40,21 +41,62 @@ export async function calculateBlurScore(imagePath: string): Promise<number> {
     }
 
     if (count === 0) {
-      return 100; // If we can't calculate, assume blurry
+      return 0;
     }
 
     const mean = sum / count;
     const variance = sumSq / count - mean * mean;
 
-    // Normalize to 0-100 scale (higher = more blurry)
-    // Typical variance ranges from 0 (very blurry) to 2000+ (very sharp)
-    const normalizedScore = Math.max(0, Math.min(100, 100 - variance / 20));
-
-    return Math.round(normalizedScore * 10) / 10;
+    return variance;
   } catch (err) {
-    log.error(`Error calculating blur score for ${imagePath}:`, err);
+    log.error(`Error calculating Laplacian variance for ${imagePath}:`, err);
     throw err;
   }
+}
+
+/**
+ * Normalize variance values to 0-100 blur scores relative to batch statistics.
+ * Uses median as baseline - frames below median variance are considered blurrier.
+ * Higher score = more blurry.
+ */
+function normalizeBlurScores(variances: (number | null)[]): (number | null)[] {
+  const validVariances = variances.filter((v): v is number => v !== null);
+
+  if (validVariances.length === 0) {
+    return variances.map(() => null);
+  }
+
+  // Sort to find min/max
+  const sorted = [...validVariances].sort((a, b) => a - b);
+  const min = sorted[0] ?? 0;
+  const max = sorted[sorted.length - 1] ?? 0;
+  const range = max - min;
+
+  return variances.map((variance) => {
+    if (variance === null) return null;
+
+    if (range === 0) {
+      // All frames have same variance, none are relatively blurry
+      return 0;
+    }
+
+    // Score: 0 = sharpest (max variance), 100 = blurriest (min variance)
+    const score = 100 * (max - variance) / range;
+    return Math.round(score * 10) / 10;
+  });
+}
+
+/**
+ * Calculate blur score for a single image (absolute scoring).
+ * Used for single-frame analysis where batch context isn't available.
+ * Higher score = more blurry (0-100 scale).
+ */
+export async function calculateBlurScore(imagePath: string): Promise<number> {
+  const variance = await calculateLaplacianVariance(imagePath);
+  // Use wider range for absolute scoring
+  // Typical variance: 0 (very blurry) to 1000+ (very sharp)
+  const score = Math.max(0, Math.min(100, 100 - variance / 10));
+  return Math.round(score * 10) / 10;
 }
 
 /**
@@ -126,43 +168,57 @@ export async function analyzeFrames(
   similarityThreshold: number,
   onProgress?: (current: number, total: number, frameNumber: number) => void
 ): Promise<FrameAnalysis[]> {
-  const results: FrameAnalysis[] = [];
+  // First pass: calculate raw variance and hash for each frame
+  const rawResults: Array<{
+    frameNumber: number;
+    timestamp: number;
+    variance: number | null;
+    perceptualHash: string | null;
+  }> = [];
 
-  // First pass: calculate blur and hash for each frame
   for (let i = 0; i < framePaths.length; i++) {
     const frame = framePaths[i];
     if (!frame) continue;
 
     try {
-      const [blurScore, perceptualHash] = await Promise.all([
-        calculateBlurScore(frame.path),
+      const [variance, perceptualHash] = await Promise.all([
+        calculateLaplacianVariance(frame.path),
         calculatePerceptualHash(frame.path),
       ]);
 
-      results.push({
+      rawResults.push({
         frameNumber: frame.frameNumber,
         timestamp: frame.timestamp,
-        blurScore,
+        variance,
         perceptualHash,
-        isDuplicate: false, // Will be calculated in second pass
-        isBlurry: blurScore > blurThreshold,
       });
 
       onProgress?.(i + 1, framePaths.length, frame.frameNumber);
     } catch (err) {
       log.warn(`Failed to analyze frame ${frame.frameNumber}:`, err);
-      // Add partial result
-      results.push({
+      rawResults.push({
         frameNumber: frame.frameNumber,
         timestamp: frame.timestamp,
-        blurScore: null,
+        variance: null,
         perceptualHash: null,
-        isDuplicate: false,
-        isBlurry: false,
       });
       onProgress?.(i + 1, framePaths.length, frame.frameNumber);
     }
   }
+
+  // Normalize blur scores relative to batch statistics
+  const variances = rawResults.map((r) => r.variance);
+  const normalizedScores = normalizeBlurScores(variances);
+
+  // Build results with normalized blur scores
+  const results: FrameAnalysis[] = rawResults.map((raw, i) => ({
+    frameNumber: raw.frameNumber,
+    timestamp: raw.timestamp,
+    blurScore: normalizedScores[i] ?? null,
+    perceptualHash: raw.perceptualHash,
+    isDuplicate: false, // Will be calculated in second pass
+    isBlurry: normalizedScores[i] !== null && normalizedScores[i]! > blurThreshold,
+  }));
 
   // Second pass: detect duplicates based on similarity
   for (let i = 0; i < results.length; i++) {

@@ -210,3 +210,20 @@ input[type='range']::-webkit-slider-thumb {
 .frame-grid.size-large {
   @apply grid-cols-[repeat(auto-fill,minmax(280px,1fr))];
 }
+
+/* Queue item breathing effect */
+@keyframes breathe {
+  0%, 100% {
+    box-shadow: 0 0 4px 1px rgba(34, 197, 94, 0.4);
+    border-color: rgba(34, 197, 94, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 12px 3px rgba(34, 197, 94, 0.7);
+    border-color: rgba(34, 197, 94, 0.9);
+  }
+}
+
+.queue-item-pending {
+  animation: breathe 2s ease-in-out infinite;
+  border: 1px solid rgba(34, 197, 94, 0.5);
+}
