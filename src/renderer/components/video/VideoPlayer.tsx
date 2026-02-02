@@ -65,11 +65,56 @@ export function VideoPlayer() {
     }
   }, [currentTimestamp]);
 
-  // Handle time updates from video element
+  // Poll video time at 60Hz during playback for smooth scrubber updates
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    let rafId: number;
+
+    const pollTime = () => {
+      const video = videoRef.current;
+      if (video && !isSeeking.current && !video.seeking) {
+        const currentStoreTime = useStore.getState().currentTimestamp;
+        const videoDuration = video.duration;
+
+        // Detect loop: video near end jumping to near start
+        const isLoopingBack = currentStoreTime > (videoDuration - 0.5) && video.currentTime < 0.5;
+
+        // Ignore large backward jumps unless it's a loop
+        if (!isLoopingBack && currentStoreTime - video.currentTime > 0.5) {
+          rafId = requestAnimationFrame(pollTime);
+          return;
+        }
+
+        // Only update if time actually changed
+        if (Math.abs(video.currentTime - currentStoreTime) > 0.001) {
+          setCurrentTimestamp(video.currentTime);
+        }
+      }
+      rafId = requestAnimationFrame(pollTime);
+    };
+
+    rafId = requestAnimationFrame(pollTime);
+    return () => cancelAnimationFrame(rafId);
+  }, [isPlaying, setCurrentTimestamp]);
+
+  // Handle time updates from video element (fallback for when paused)
   const handleTimeUpdate = useCallback(() => {
     const video = videoRef.current;
-    // Don't update store while seeking
-    if (video && !isSeeking.current && !video.seeking) {
+    // Don't update store while seeking or playing (rAF handles playing)
+    if (video && !isSeeking.current && !video.seeking && video.paused) {
+      const currentStoreTime = useStore.getState().currentTimestamp;
+      const videoDuration = video.duration;
+
+      // Detect loop: video near end jumping to near start (only when actually playing)
+      const isActuallyPlaying = !video.paused;
+      const isLoopingBack = isActuallyPlaying && currentStoreTime > (videoDuration - 0.5) && video.currentTime < 0.5;
+
+      // Ignore large backward jumps (likely from video element resetting unexpectedly)
+      // but allow the loop case
+      if (!isLoopingBack && currentStoreTime - video.currentTime > 0.5) {
+        return;
+      }
       setCurrentTimestamp(video.currentTime);
     }
   }, [setCurrentTimestamp]);

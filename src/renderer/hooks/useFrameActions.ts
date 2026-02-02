@@ -13,6 +13,7 @@ export function useFrameActions() {
     addToast,
     setExtractionProgress,
     ffmpegStatus,
+    setFramesSavedForCurrentVideo,
   } = useStore();
 
   // Save selected frames to disk
@@ -55,6 +56,8 @@ export function useFrameActions() {
         message: `Saved ${result.savedPaths.length} frames`,
         duration: 3000,
       });
+
+      setFramesSavedForCurrentVideo(true);
 
       // Offer to open folder
       await window.electronAPI.invoke('fs:open-folder', { folderPath: outputDir });
@@ -140,6 +143,8 @@ export function useFrameActions() {
           message: `Exported ${format.toUpperCase()} successfully`,
           duration: 3000,
         });
+
+        setFramesSavedForCurrentVideo(true);
 
         // Open containing folder
         await window.electronAPI.invoke('fs:open-folder', { folderPath: baseDir });

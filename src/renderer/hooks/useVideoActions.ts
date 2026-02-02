@@ -29,6 +29,7 @@ export function useVideoActions() {
     ffmpegStatus,
     videosInDirectory,
     currentVideoIndex,
+    setFramesSavedForCurrentVideo,
   } = useStore();
 
   // Save current video state before switching
@@ -86,9 +87,9 @@ export function useVideoActions() {
       await saveCurrentVideoState();
       timing['saveCurrentVideoState'] = performance.now() - stepStart;
 
-      // Auto-save selected frames before switching videos
+      // Auto-save selected frames before switching videos (only if not already saved)
       const currentState = useStore.getState();
-      if (currentState.currentVideo && currentState.selectedFrames.size > 0) {
+      if (currentState.currentVideo && currentState.selectedFrames.size > 0 && !currentState.framesSavedForCurrentVideo) {
         try {
           const baseDir = settings.outputFolderBase ?? currentState.currentVideo.directory;
           const videoName = currentState.currentVideo.fileName.replace(/\.[^.]+$/, '');
@@ -139,13 +140,12 @@ export function useVideoActions() {
         setCurrentTimestamp(0);
         setExtractionProgress(null);
 
-        // Load saved state for this video (but not frame selections - those always start fresh)
+        // Load saved state for this video (but not frame selections or position - those always start fresh)
         stepStart = performance.now();
         const savedState = await window.electronAPI.invoke('db:get-video-state', { filePath });
         timing['db:get-video-state'] = performance.now() - stepStart;
         if (savedState) {
           setTimelineMarkers(savedState.timelineMarkers);
-          setCurrentTimestamp(savedState.lastPosition);
         }
 
         // Clear directory list if we changed directories

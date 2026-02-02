@@ -81,6 +81,9 @@ interface FramesSlice {
   setShowBlurryFrames: (show: boolean) => void;
   showDuplicateFrames: boolean;
   setShowDuplicateFrames: (show: boolean) => void;
+
+  framesSavedForCurrentVideo: boolean;
+  setFramesSavedForCurrentVideo: (saved: boolean) => void;
 }
 
 interface TimelineSlice {
@@ -225,26 +228,26 @@ export const useStore = create<FrameFarmerStore>()((set, get) => ({
         } else {
           newSet.add(frameNumber);
         }
-        return { selectedFrames: newSet, lastClickedFrame: frameNumber };
+        return { selectedFrames: newSet, lastClickedFrame: frameNumber, framesSavedForCurrentVideo: false };
       }),
     selectFrame: (frameNumber) =>
       set((state) => {
         const newSet = new Set(state.selectedFrames);
         newSet.add(frameNumber);
-        return { selectedFrames: newSet };
+        return { selectedFrames: newSet, framesSavedForCurrentVideo: false };
       }),
     deselectFrame: (frameNumber) =>
       set((state) => {
         const newSet = new Set(state.selectedFrames);
         newSet.delete(frameNumber);
-        return { selectedFrames: newSet };
+        return { selectedFrames: newSet, framesSavedForCurrentVideo: false };
       }),
     selectAll: () =>
       set((state) => {
         const allFrameNumbers = state.frames.map((f) => f.frameNumber);
-        return { selectedFrames: new Set(allFrameNumbers) };
+        return { selectedFrames: new Set(allFrameNumbers), framesSavedForCurrentVideo: false };
       }),
-    selectNone: () => set({ selectedFrames: new Set() }),
+    selectNone: () => set({ selectedFrames: new Set(), framesSavedForCurrentVideo: false }),
     invertSelection: () =>
       set((state) => {
         const inverted = new Set<number>();
@@ -253,7 +256,7 @@ export const useStore = create<FrameFarmerStore>()((set, get) => ({
             inverted.add(frame.frameNumber);
           }
         }
-        return { selectedFrames: inverted };
+        return { selectedFrames: inverted, framesSavedForCurrentVideo: false };
       }),
     selectRange: (start, end) =>
       set((state) => {
@@ -265,9 +268,9 @@ export const useStore = create<FrameFarmerStore>()((set, get) => ({
             newSet.add(frame.frameNumber);
           }
         }
-        return { selectedFrames: newSet };
+        return { selectedFrames: newSet, framesSavedForCurrentVideo: false };
       }),
-    setSelectedFrames: (frameNumbers) => set({ selectedFrames: new Set(frameNumbers) }),
+    setSelectedFrames: (frameNumbers) => set({ selectedFrames: new Set(frameNumbers), framesSavedForCurrentVideo: false }),
     lastClickedFrame: null,
     setLastClickedFrame: (frameNumber) => set({ lastClickedFrame: frameNumber }),
     hoveredFrame: null,
@@ -302,6 +305,9 @@ export const useStore = create<FrameFarmerStore>()((set, get) => ({
     setShowBlurryFrames: (show) => set({ showBlurryFrames: show }),
     showDuplicateFrames: true,
     setShowDuplicateFrames: (show) => set({ showDuplicateFrames: show }),
+
+    framesSavedForCurrentVideo: false,
+    setFramesSavedForCurrentVideo: (saved) => set({ framesSavedForCurrentVideo: saved }),
 
     // ============ Timeline Slice ============
     timelineMarkers: [],
