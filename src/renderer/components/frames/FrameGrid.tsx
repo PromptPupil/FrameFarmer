@@ -15,10 +15,14 @@ export function FrameGrid() {
     showDuplicateFrames,
     settings,
     lastClickedFrame,
+    currentVideo,
     toggleFrameSelection,
     selectRange,
     setLastClickedFrame,
   } = useStore();
+
+  // Determine if video is landscape orientation
+  const isLandscape = currentVideo ? currentVideo.width > currentVideo.height : false;
 
   // Filter frames based on current filter settings
   const filteredFrames = useMemo(() => {
@@ -74,7 +78,7 @@ export function FrameGrid() {
       <FrameFilters />
 
       {/* Frame grid */}
-      <div className={`frame-grid ${sizeClass} flex-1 overflow-auto`}>
+      <div className={`frame-grid ${sizeClass} ${isLandscape ? 'landscape' : 'portrait'} flex-1 overflow-auto`}>
         {filteredFrames.map((frame) => (
           <FrameThumbnail
             key={frame.frameNumber}
@@ -83,6 +87,7 @@ export function FrameGrid() {
             analysis={analysisResults.get(frame.frameNumber) ?? null}
             onClick={(e) => handleFrameClick(frame, e)}
             showFrameNumber={settings.showFrameNumbers}
+            isLandscape={isLandscape}
           />
         ))}
 

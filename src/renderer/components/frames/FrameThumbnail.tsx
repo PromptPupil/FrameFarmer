@@ -12,6 +12,7 @@ interface FrameThumbnailProps {
   analysis: FrameAnalysis | null;
   onClick: (e: React.MouseEvent) => void;
   showFrameNumber: boolean;
+  isLandscape: boolean;
 }
 
 export const FrameThumbnail = memo(function FrameThumbnail({
@@ -20,6 +21,7 @@ export const FrameThumbnail = memo(function FrameThumbnail({
   analysis,
   onClick,
   showFrameNumber,
+  isLandscape,
 }: FrameThumbnailProps) {
   const { setHoveredFrame, setPinnedPreviewFrame } = useStore();
 
@@ -31,7 +33,7 @@ export const FrameThumbnail = memo(function FrameThumbnail({
     <div
       className={`frame-thumbnail relative cursor-pointer rounded overflow-hidden ${
         isSelected ? 'selected' : ''
-      }`}
+      } ${isLandscape ? 'aspect-video' : 'aspect-[9/16]'}`}
       onClick={onClick}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -55,7 +57,7 @@ export const FrameThumbnail = memo(function FrameThumbnail({
       <img
         src={thumbnailSrc}
         alt={`Frame ${frame.frameNumber}`}
-        className="w-full h-auto object-cover"
+        className="w-full h-full object-contain"
         loading="lazy"
       />
 

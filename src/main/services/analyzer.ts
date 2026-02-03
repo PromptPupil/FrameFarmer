@@ -3,6 +3,82 @@ import log from 'electron-log';
 import type { FrameAnalysis } from '../../shared/types';
 
 /**
+ * Blur detection method selection.
+ * - 'gradient': Gradient direction variance (detects directional motion blur)
+ * - 'motion': Frame-to-frame hash difference (detects scene change/motion)
+ * - 'laplacian': Laplacian variance (detects overall edge contrast)
+ */
+const BLUR_DETECTION_METHOD: 'gradient' | 'motion' | 'laplacian' = 'gradient';
+
+/**
+ * Calculate gradient direction variance for an image.
+ * Motion blur creates edges predominantly in one direction (perpendicular to motion).
+ * Sharp images have edges in all directions.
+ * Returns 0-100 where higher = more directional blur detected.
+ */
+export async function calculateGradientDirectionScore(imagePath: string): Promise<number> {
+  try {
+    // Downsample for performance - 200px wide is enough to detect directionality
+    const { data, info } = await sharp(imagePath)
+      .grayscale()
+      .resize(200, null, { fit: 'inside' })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const width = info.width;
+    const height = info.height;
+
+    // Compute gradients and accumulate angle statistics
+    let sumCos = 0;
+    let sumSin = 0;
+    let count = 0;
+
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const idx = y * width + x;
+
+        // Sobel-like gradient computation
+        const left = data[idx - 1] ?? 0;
+        const right = data[idx + 1] ?? 0;
+        const top = data[idx - width] ?? 0;
+        const bottom = data[idx + width] ?? 0;
+
+        const gx = right - left;
+        const gy = bottom - top;
+
+        // Skip low-gradient pixels (flat areas)
+        const magnitude = Math.sqrt(gx * gx + gy * gy);
+        if (magnitude < 10) continue;
+
+        // Compute angle and accumulate for circular statistics
+        const angle = Math.atan2(gy, gx);
+        // Use doubled angle to make opposite directions equivalent (edge has same direction either way)
+        const doubledAngle = angle * 2;
+        sumCos += Math.cos(doubledAngle);
+        sumSin += Math.sin(doubledAngle);
+        count++;
+      }
+    }
+
+    if (count === 0) {
+      return 0; // No edges detected, can't determine blur
+    }
+
+    // Mean resultant length (R) - measures concentration of angles
+    // R near 1 = all edges point same direction = directional blur
+    // R near 0 = edges spread in all directions = sharp
+    const R = Math.sqrt(sumCos * sumCos + sumSin * sumSin) / count;
+
+    // Convert to 0-100 score where higher = more blur
+    const score = R * 100;
+    return Math.round(score * 10) / 10;
+  } catch (err) {
+    log.error(`Error calculating gradient direction score for ${imagePath}:`, err);
+    throw err;
+  }
+}
+
+/**
  * Calculate raw Laplacian variance for an image.
  * Higher variance = sharper image.
  * Returns raw variance value (not normalized).
@@ -55,33 +131,31 @@ export async function calculateLaplacianVariance(imagePath: string): Promise<num
 }
 
 /**
- * Normalize variance values to 0-100 blur scores relative to batch statistics.
- * Uses median as baseline - frames below median variance are considered blurrier.
- * Higher score = more blurry.
+ * Normalize raw scores to 0-100 relative to batch.
+ * @param invert - If true, high raw value = low score (for Laplacian where high variance = sharp)
  */
-function normalizeBlurScores(variances: (number | null)[]): (number | null)[] {
-  const validVariances = variances.filter((v): v is number => v !== null);
+function normalizeScores(values: (number | null)[], invert: boolean): (number | null)[] {
+  const validValues = values.filter((v): v is number => v !== null);
 
-  if (validVariances.length === 0) {
-    return variances.map(() => null);
+  if (validValues.length === 0) {
+    return values.map(() => null);
   }
 
-  // Sort to find min/max
-  const sorted = [...validVariances].sort((a, b) => a - b);
+  const sorted = [...validValues].sort((a, b) => a - b);
   const min = sorted[0] ?? 0;
   const max = sorted[sorted.length - 1] ?? 0;
   const range = max - min;
 
-  return variances.map((variance) => {
-    if (variance === null) return null;
+  return values.map((value) => {
+    if (value === null) return null;
 
     if (range === 0) {
-      // All frames have same variance, none are relatively blurry
       return 0;
     }
 
-    // Score: 0 = sharpest (max variance), 100 = blurriest (min variance)
-    const score = 100 * (max - variance) / range;
+    const score = invert
+      ? 100 * (max - value) / range  // High value = low score
+      : 100 * (value - min) / range; // High value = high score
     return Math.round(score * 10) / 10;
   });
 }
@@ -168,12 +242,12 @@ export async function analyzeFrames(
   similarityThreshold: number,
   onProgress?: (current: number, total: number, frameNumber: number) => void
 ): Promise<FrameAnalysis[]> {
-  // First pass: calculate raw variance and hash for each frame
+  // First pass: calculate perceptual hash and blur metric for each frame
   const rawResults: Array<{
     frameNumber: number;
     timestamp: number;
-    variance: number | null;
     perceptualHash: string | null;
+    rawBlurValue: number | null;
   }> = [];
 
   for (let i = 0; i < framePaths.length; i++) {
@@ -181,16 +255,23 @@ export async function analyzeFrames(
     if (!frame) continue;
 
     try {
-      const [variance, perceptualHash] = await Promise.all([
-        calculateLaplacianVariance(frame.path),
-        calculatePerceptualHash(frame.path),
-      ]);
+      // Always compute perceptual hash (needed for duplicates)
+      const perceptualHash = await calculatePerceptualHash(frame.path);
+
+      // Compute blur metric based on selected method
+      let rawBlurValue: number | null = null;
+      if (BLUR_DETECTION_METHOD === 'gradient') {
+        rawBlurValue = await calculateGradientDirectionScore(frame.path);
+      } else if (BLUR_DETECTION_METHOD === 'laplacian') {
+        rawBlurValue = await calculateLaplacianVariance(frame.path);
+      }
+      // For 'motion' method, blur is calculated after all hashes are collected
 
       rawResults.push({
         frameNumber: frame.frameNumber,
         timestamp: frame.timestamp,
-        variance,
         perceptualHash,
+        rawBlurValue,
       });
 
       onProgress?.(i + 1, framePaths.length, frame.frameNumber);
@@ -199,18 +280,36 @@ export async function analyzeFrames(
       rawResults.push({
         frameNumber: frame.frameNumber,
         timestamp: frame.timestamp,
-        variance: null,
         perceptualHash: null,
+        rawBlurValue: null,
       });
       onProgress?.(i + 1, framePaths.length, frame.frameNumber);
     }
   }
 
-  // Normalize blur scores relative to batch statistics
-  const variances = rawResults.map((r) => r.variance);
-  const normalizedScores = normalizeBlurScores(variances);
+  // Calculate final blur scores based on method
+  let normalizedScores: (number | null)[];
 
-  // Build results with normalized blur scores
+  if (BLUR_DETECTION_METHOD === 'motion') {
+    // Motion method: compare consecutive frame hashes
+    const motionDistances: (number | null)[] = rawResults.map((current, i) => {
+      if (!current.perceptualHash) return null;
+      if (i === 0) return null;
+      const previous = rawResults[i - 1];
+      if (!previous?.perceptualHash) return null;
+      return hammingDistance(current.perceptualHash, previous.perceptualHash);
+    });
+    normalizedScores = normalizeScores(motionDistances, false);
+  } else if (BLUR_DETECTION_METHOD === 'laplacian') {
+    // Laplacian: high variance = sharp, so invert
+    const variances = rawResults.map((r) => r.rawBlurValue);
+    normalizedScores = normalizeScores(variances, true);
+  } else {
+    // Gradient: score is already 0-100, use directly (no normalization)
+    normalizedScores = rawResults.map((r) => r.rawBlurValue);
+  }
+
+  // Build results with blur scores
   const results: FrameAnalysis[] = rawResults.map((raw, i) => ({
     frameNumber: raw.frameNumber,
     timestamp: raw.timestamp,

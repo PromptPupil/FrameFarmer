@@ -240,14 +240,15 @@ class FFmpegService {
     videoPath: string,
     timestamp: number,
     outputPath: string,
-    options?: { width?: number }
+    options?: { size?: number }
   ): Promise<void> {
     this.ensureAvailable();
 
     const args = ['-ss', timestamp.toFixed(3), '-i', videoPath, '-vframes', '1', '-q:v', '2'];
 
-    if (options?.width) {
-      args.push('-vf', `scale=${options.width}:-1`);
+    if (options?.size) {
+      // Scale to fit within size x size box, constraining the larger dimension
+      args.push('-vf', `scale=${options.size}:${options.size}:force_original_aspect_ratio=decrease`);
     }
 
     args.push('-y', outputPath);
@@ -259,7 +260,7 @@ class FFmpegService {
     videoPath: string,
     timestamps: number[],
     outputDir: string,
-    options?: { width?: number; concurrency?: number },
+    options?: { size?: number; concurrency?: number },
     onProgress?: (current: number, total: number) => void
   ): Promise<ExtractedFrame[]> {
     this.ensureAvailable();
@@ -284,7 +285,7 @@ class FFmpegService {
         const outputPath = path.join(outputDir, `thumb_${String(frameIndex).padStart(5, '0')}.jpg`);
 
         const frameStart = Date.now();
-        await this.extractFrame(videoPath, ts, outputPath, options);
+        await this.extractFrame(videoPath, ts, outputPath, { size: options?.size });
         log.info(`[TIMING] single frame ${frameIndex} at ${ts.toFixed(2)}s - ${Date.now() - frameStart}ms`);
 
         completed++;
@@ -371,7 +372,7 @@ class FFmpegService {
       videoPath,
       timestamps,
       cacheDir,
-      { width: thumbnailWidth },
+      { size: thumbnailWidth },
       onProgress
     );
     log.info(`[TIMING] extractMultipleFrames - ${Date.now() - extractStart}ms`);
@@ -401,7 +402,7 @@ class FFmpegService {
       videoPath,
       timestamp,
       outputPath,
-      fullRes ? undefined : { width: 320 }
+      fullRes ? undefined : { size: 320 }
     );
 
     return {
