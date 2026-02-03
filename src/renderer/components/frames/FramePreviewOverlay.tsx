@@ -30,7 +30,9 @@ export function FramePreviewOverlay() {
     return null;
   }
 
-  const imageSrc = `local-file:///${fullscreenFrame.thumbnailPath.replace(/\\/g, '/')}`;
+  // Use full-res path if available, fallback to thumbnail for older cached frames
+  const imagePath = fullscreenFrame.fullResPath ?? fullscreenFrame.thumbnailPath;
+  const imageSrc = `local-file:///${imagePath.replace(/\\/g, '/')}`;
 
   return (
     <div

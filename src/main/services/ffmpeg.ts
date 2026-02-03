@@ -282,10 +282,15 @@ class FFmpegService {
       const batchPromises = batch.map(async (ts, idx) => {
         const frameIndex = i + idx;
         const frameNumber = Math.round(ts * videoInfo.frameRate);
-        const outputPath = path.join(outputDir, `thumb_${String(frameIndex).padStart(5, '0')}.jpg`);
+        const thumbPath = path.join(outputDir, `thumb_${String(frameIndex).padStart(5, '0')}.jpg`);
+        const fullResPath = path.join(outputDir, `full_${String(frameIndex).padStart(5, '0')}.png`);
 
         const frameStart = Date.now();
-        await this.extractFrame(videoPath, ts, outputPath, { size: options?.size });
+        // Extract both thumbnail and full-res in parallel
+        await Promise.all([
+          this.extractFrame(videoPath, ts, thumbPath, { size: options?.size }),
+          this.extractFrame(videoPath, ts, fullResPath),
+        ]);
         log.info(`[TIMING] single frame ${frameIndex} at ${ts.toFixed(2)}s - ${Date.now() - frameStart}ms`);
 
         completed++;
@@ -294,7 +299,8 @@ class FFmpegService {
         return {
           frameNumber,
           timestamp: ts,
-          thumbnailPath: outputPath,
+          thumbnailPath: thumbPath,
+          fullResPath,
         };
       });
 

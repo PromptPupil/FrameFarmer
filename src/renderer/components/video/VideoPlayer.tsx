@@ -166,10 +166,10 @@ export function VideoPlayer() {
             <span className="text-lg text-white">{loadingMessage}</span>
           </div>
         )}
-        {/* Hover preview - shows frame thumbnail in video area when hovering */}
+        {/* Hover preview - shows full-res frame in video area when hovering */}
         {hoveredFrame && (
           <img
-            src={`local-file:///${hoveredFrame.thumbnailPath.replace(/\\/g, '/')}`}
+            src={`local-file:///${(hoveredFrame.fullResPath ?? hoveredFrame.thumbnailPath).replace(/\\/g, '/')}`}
             alt={`Frame ${hoveredFrame.frameNumber} preview`}
             className="absolute inset-0 w-full h-full object-contain z-5"
           />
